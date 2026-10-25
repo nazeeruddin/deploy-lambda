@@ -1,0 +1,67 @@
+name: Deploy Python Lambda
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: practice-lambda-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Get code from GitHub
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Install Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+
+      # 3. Validate Python syntax
+      - name: Check Lambda code
+        run: python -m py_compile main.py
+
+      # 4. Package dependencies and code
+      - name: Build Lambda ZIP
+        run: |
+          mkdir -p package
+
+          python -m pip install \
+            -r requirements.txt \
+            --target package
+
+          cp main.py package/
+
+          cd package
+          zip -r ../lambda-deployment.zip .
+
+      # 5. Authenticate to AWS using OIDC
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      # 6. Update the existing Lambda
+      - name: Deploy to AWS Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name practice_lambda \
+            --zip-file fileb://lambda-deployment.zip
+
+          aws lambda wait function-updated \
+            --function-name practice_lambda
+
+          echo "Lambda deployment successful!"
