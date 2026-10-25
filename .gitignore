@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+package/
+build/
+*.zip
+.aws-sam/
+.pytest_cache/
